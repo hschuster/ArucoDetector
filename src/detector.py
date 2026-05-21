@@ -33,16 +33,13 @@ class ArucoDetector:
 
         """
         Erkennt Marker und zeichnet:
-        - roten/grünen Rahmen
+        - alle Marker mit Rahmen
         - Pfeil zur Bildmitte
-        - Distanzanzeige
         - Marker-ID
-        - Geschwindigkeit
-        - Servo-/Motorwerte
-        - Zielkreis
+        - Distanz
 
-        Es wird nur der Marker verfolgt,
-        der dem Bildmittelpunkt am nächsten ist.
+        Zusätzliche Infos (Speed, Servo, LOCKED)
+        werden nur für den nächsten Marker angezeigt.
         """
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -81,7 +78,7 @@ class ArucoDetector:
             nearest_distance = float("inf")
 
             # ----------------------------------------------------------------------------------------------------------
-            # Nächsten Marker bestimmen
+            # Alle Marker zeichnen + nächsten Marker bestimmen
             # ----------------------------------------------------------------------------------------------------------
 
             for i, marker_corners in enumerate(corners):
@@ -91,43 +88,32 @@ class ArucoDetector:
                 marker_center_x = int(pts[:, 0].mean())
                 marker_center_y = int(pts[:, 1].mean())
 
+                marker_center = (
+                    marker_center_x,
+                    marker_center_y
+                )
+
                 distance = math.sqrt(
                     (marker_center_x - center_x) ** 2 +
                     (marker_center_y - center_y) ** 2
                 )
+
+                marker_id = int(ids[i][0])
+
+                # ------------------------------------------------------------------------------------------------------
+                # Nächsten Marker merken
+                # ------------------------------------------------------------------------------------------------------
 
                 if distance < nearest_distance:
 
                     nearest_distance = distance
 
                     nearest_marker = {
-                        "index": i,
-                        "pts": pts,
                         "center_x": marker_center_x,
                         "center_y": marker_center_y,
                         "distance": distance,
-                        "id": int(ids[i][0])
+                        "id": marker_id
                     }
-
-            # ----------------------------------------------------------------------------------------------------------
-            # Nur nächsten Marker darstellen
-            # ----------------------------------------------------------------------------------------------------------
-
-            if nearest_marker is not None:
-
-                pts = nearest_marker["pts"]
-
-                marker_center_x = nearest_marker["center_x"]
-                marker_center_y = nearest_marker["center_y"]
-
-                marker_center = (
-                    marker_center_x,
-                    marker_center_y
-                )
-
-                distance = nearest_marker["distance"]
-
-                marker_id = nearest_marker["id"]
 
                 # ------------------------------------------------------------------------------------------------------
                 # Farbe abhängig vom Abstand
@@ -135,10 +121,8 @@ class ArucoDetector:
 
                 if distance <= target_radius:
                     color = (0, 255, 0)
-                    status_text = "LOCKED"
                 else:
                     color = (0, 0, 255)
-                    status_text = "TRACKING"
 
                 # ------------------------------------------------------------------------------------------------------
                 # Markerrahmen
@@ -153,7 +137,7 @@ class ArucoDetector:
                 )
 
                 # ------------------------------------------------------------------------------------------------------
-                # Mittelpunkt Marker
+                # Mittelpunkt
                 # ------------------------------------------------------------------------------------------------------
 
                 cv2.circle(
@@ -173,26 +157,12 @@ class ArucoDetector:
                     frame_center,
                     marker_center,
                     color,
-                    3,
+                    2,
                     tipLength=0.05
                 )
 
                 # ------------------------------------------------------------------------------------------------------
-                # Distanz anzeigen
-                # ------------------------------------------------------------------------------------------------------
-
-                cv2.putText(
-                    frame,
-                    f"Dist: {distance:.1f}px",
-                    (20, 40),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.8,
-                    color,
-                    2
-                )
-
-                # ------------------------------------------------------------------------------------------------------
-                # Marker-ID anzeigen
+                # Marker-ID
                 # ------------------------------------------------------------------------------------------------------
 
                 cv2.putText(
@@ -204,6 +174,42 @@ class ArucoDetector:
                     color,
                     2
                 )
+
+                # ------------------------------------------------------------------------------------------------------
+                # Distanz
+                # ------------------------------------------------------------------------------------------------------
+
+                cv2.putText(
+                    frame,
+                    f"{distance:.0f}px",
+                    (marker_center_x + 10, marker_center_y + 20),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    color,
+                    2
+                )
+
+            # ----------------------------------------------------------------------------------------------------------
+            # Zusätzliche Infos nur für nächsten Marker
+            # ----------------------------------------------------------------------------------------------------------
+
+            if nearest_marker is not None:
+
+                marker_center_x = nearest_marker["center_x"]
+                marker_center_y = nearest_marker["center_y"]
+
+                distance = nearest_marker["distance"]
+
+                # ------------------------------------------------------------------------------------------------------
+                # Status
+                # ------------------------------------------------------------------------------------------------------
+
+                if distance <= target_radius:
+                    color = (0, 255, 0)
+                    status_text = "LOCKED"
+                else:
+                    color = (0, 0, 255)
+                    status_text = "TRACKING"
 
                 # ------------------------------------------------------------------------------------------------------
                 # Geschwindigkeit berechnen
@@ -235,16 +241,6 @@ class ArucoDetector:
 
                 self.last_time = current_time
 
-                cv2.putText(
-                    frame,
-                    f"Speed: {speed:.1f}px/s",
-                    (20, 80),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.8,
-                    color,
-                    2
-                )
-
                 # ------------------------------------------------------------------------------------------------------
                 # Servo-/Motorsteuerung
                 # ------------------------------------------------------------------------------------------------------
@@ -255,10 +251,44 @@ class ArucoDetector:
                 servo_x = error_x * servo_gain_x
                 servo_y = error_y * servo_gain_y
 
+                # ------------------------------------------------------------------------------------------------------
+                # Overlay-Infos
+                # ------------------------------------------------------------------------------------------------------
+
+                cv2.putText(
+                    frame,
+                    f"Nearest ID: {nearest_marker['id']}",
+                    (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    color,
+                    2
+                )
+
+                cv2.putText(
+                    frame,
+                    f"Distance: {distance:.1f}px",
+                    (20, 80),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    color,
+                    2
+                )
+
+                cv2.putText(
+                    frame,
+                    f"Speed: {speed:.1f}px/s",
+                    (20, 120),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    color,
+                    2
+                )
+
                 cv2.putText(
                     frame,
                     f"Servo X: {servo_x:.2f}",
-                    (20, 120),
+                    (20, 160),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
                     (255, 255, 0),
@@ -268,21 +298,17 @@ class ArucoDetector:
                 cv2.putText(
                     frame,
                     f"Servo Y: {servo_y:.2f}",
-                    (20, 150),
+                    (20, 190),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
                     (255, 255, 0),
                     2
                 )
 
-                # ------------------------------------------------------------------------------------------------------
-                # Status
-                # ------------------------------------------------------------------------------------------------------
-
                 cv2.putText(
                     frame,
                     status_text,
-                    (20, 190),
+                    (20, 240),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     1.0,
                     color,
