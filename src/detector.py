@@ -34,12 +34,15 @@ class ArucoDetector:
         """
         Erkennt Marker und zeichnet:
         - alle Marker mit Rahmen
-        - Pfeil zur Bildmitte
-        - Marker-ID
-        - Distanz
+        - nur für nächsten Marker:
+            - Pfeil
+            - Speed
+            - Servo-Werte
+            - Status
 
-        Zusätzliche Infos (Speed, Servo, LOCKED)
-        werden nur für den nächsten Marker angezeigt.
+        Farben:
+        - nächster Marker = rot/grün
+        - andere Marker = hellblau
         """
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -54,7 +57,15 @@ class ArucoDetector:
 
         frame_center = (center_x, center_y)
 
-        # Zielkreis zeichnen
+        # Farben
+        LIGHT_BLUE = (255, 255, 0)
+        RED = (0, 0, 255)
+        GREEN = (0, 255, 0)
+
+        # --------------------------------------------------------------------------------------------------------------
+        # Zielkreis
+        # --------------------------------------------------------------------------------------------------------------
+
         cv2.circle(
             frame,
             frame_center,
@@ -63,7 +74,6 @@ class ArucoDetector:
             2
         )
 
-        # Mittelpunkt markieren
         cv2.circle(
             frame,
             frame_center,
@@ -77,8 +87,10 @@ class ArucoDetector:
             nearest_marker = None
             nearest_distance = float("inf")
 
+            marker_data = []
+
             # ----------------------------------------------------------------------------------------------------------
-            # Alle Marker zeichnen + nächsten Marker bestimmen
+            # Marker analysieren
             # ----------------------------------------------------------------------------------------------------------
 
             for i, marker_corners in enumerate(corners):
@@ -100,32 +112,62 @@ class ArucoDetector:
 
                 marker_id = int(ids[i][0])
 
-                # ------------------------------------------------------------------------------------------------------
-                # Nächsten Marker merken
-                # ------------------------------------------------------------------------------------------------------
+                marker_info = {
+                    "pts": pts,
+                    "center_x": marker_center_x,
+                    "center_y": marker_center_y,
+                    "center": marker_center,
+                    "distance": distance,
+                    "id": marker_id
+                }
 
+                marker_data.append(marker_info)
+
+                # nächsten Marker merken
                 if distance < nearest_distance:
 
                     nearest_distance = distance
+                    nearest_marker = marker_info
 
-                    nearest_marker = {
-                        "center_x": marker_center_x,
-                        "center_y": marker_center_y,
-                        "distance": distance,
-                        "id": marker_id
-                    }
+            # ----------------------------------------------------------------------------------------------------------
+            # Alle Marker zeichnen
+            # ----------------------------------------------------------------------------------------------------------
+
+            for marker in marker_data:
+
+                pts = marker["pts"]
+
+                marker_center_x = marker["center_x"]
+                marker_center_y = marker["center_y"]
+
+                marker_center = marker["center"]
+
+                distance = marker["distance"]
+
+                marker_id = marker["id"]
+
+                is_nearest = (
+                        marker["id"] == nearest_marker["id"]
+                        and marker["center_x"] == nearest_marker["center_x"]
+                        and marker["center_y"] == nearest_marker["center_y"]
+                )
 
                 # ------------------------------------------------------------------------------------------------------
-                # Farbe abhängig vom Abstand
+                # Farbe bestimmen
                 # ------------------------------------------------------------------------------------------------------
 
-                if distance <= target_radius:
-                    color = (0, 255, 0)
+                if is_nearest:
+
+                    if distance <= target_radius:
+                        color = GREEN
+                    else:
+                        color = RED
+
                 else:
-                    color = (0, 0, 255)
+                    color = LIGHT_BLUE
 
                 # ------------------------------------------------------------------------------------------------------
-                # Markerrahmen
+                # Rahmen
                 # ------------------------------------------------------------------------------------------------------
 
                 cv2.polylines(
@@ -146,19 +188,6 @@ class ArucoDetector:
                     6,
                     color,
                     -1
-                )
-
-                # ------------------------------------------------------------------------------------------------------
-                # Pfeil zur Bildmitte
-                # ------------------------------------------------------------------------------------------------------
-
-                cv2.arrowedLine(
-                    frame,
-                    frame_center,
-                    marker_center,
-                    color,
-                    2,
-                    tipLength=0.05
                 )
 
                 # ------------------------------------------------------------------------------------------------------
@@ -189,8 +218,23 @@ class ArucoDetector:
                     2
                 )
 
+                # ------------------------------------------------------------------------------------------------------
+                # Pfeil NUR für nächsten Marker
+                # ------------------------------------------------------------------------------------------------------
+
+                if is_nearest:
+
+                    cv2.arrowedLine(
+                        frame,
+                        frame_center,
+                        marker_center,
+                        color,
+                        3,
+                        tipLength=0.05
+                    )
+
             # ----------------------------------------------------------------------------------------------------------
-            # Zusätzliche Infos nur für nächsten Marker
+            # Zusatzinfos nur für nächsten Marker
             # ----------------------------------------------------------------------------------------------------------
 
             if nearest_marker is not None:
@@ -205,14 +249,14 @@ class ArucoDetector:
                 # ------------------------------------------------------------------------------------------------------
 
                 if distance <= target_radius:
-                    color = (0, 255, 0)
+                    color = GREEN
                     status_text = "LOCKED"
                 else:
-                    color = (0, 0, 255)
+                    color = RED
                     status_text = "TRACKING"
 
                 # ------------------------------------------------------------------------------------------------------
-                # Geschwindigkeit berechnen
+                # Geschwindigkeit
                 # ------------------------------------------------------------------------------------------------------
 
                 current_time = time.time()
@@ -242,7 +286,7 @@ class ArucoDetector:
                 self.last_time = current_time
 
                 # ------------------------------------------------------------------------------------------------------
-                # Servo-/Motorsteuerung
+                # Servo-Werte
                 # ------------------------------------------------------------------------------------------------------
 
                 error_x = marker_center_x - center_x
@@ -252,7 +296,7 @@ class ArucoDetector:
                 servo_y = error_y * servo_gain_y
 
                 # ------------------------------------------------------------------------------------------------------
-                # Overlay-Infos
+                # Overlay
                 # ------------------------------------------------------------------------------------------------------
 
                 cv2.putText(
@@ -291,7 +335,7 @@ class ArucoDetector:
                     (20, 160),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
-                    (255, 255, 0),
+                    LIGHT_BLUE,
                     2
                 )
 
@@ -301,7 +345,7 @@ class ArucoDetector:
                     (20, 190),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
-                    (255, 255, 0),
+                    LIGHT_BLUE,
                     2
                 )
 
