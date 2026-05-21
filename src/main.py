@@ -66,7 +66,7 @@ def main():
         process_video(args.video)
 
     elif args.webcam:
-        process_video(0)
+        process_video(1)  # 0=Lappi-Cam, 1=Webcam
 
     else:
         print("Bitte Parameter angeben: --image | --video | --webcam")
