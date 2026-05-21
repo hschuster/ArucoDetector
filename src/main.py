@@ -1,12 +1,30 @@
 import cv2
 import argparse
+from datetime import datetime
 
 from detector import ArucoDetector
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+def create_timestamp_filename():
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    return f"aruco_recording_{timestamp}.mp4"
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def create_screenshot_filename():
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    return f"aruco_screenshot_{timestamp}.png"
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 def process_image(path,
                   target_radius):
+
     detector = ArucoDetector()
 
     frame = cv2.imread(path)
@@ -30,6 +48,7 @@ def process_image(path,
 # ----------------------------------------------------------------------------------------------------------------------
 def process_video(source,
                   target_radius):
+
     detector = ArucoDetector()
 
     cap = cv2.VideoCapture(source)
@@ -37,6 +56,14 @@ def process_video(source,
     if not cap.isOpened():
         print("Videoquelle konnte nicht geöffnet werden")
         return
+
+    writer = None
+    recording = False
+
+    print("Steuerung:")
+    print("  ESC = Beenden")
+    print("  R    = Aufnahme Start/Stop")
+    print("  S    = Screenshot")
 
     while True:
 
@@ -50,6 +77,28 @@ def process_video(source,
             target_radius=target_radius
         )
 
+        # --------------------------------------------------------------------------------------------------------------
+        # Aufnahme speichern
+        # --------------------------------------------------------------------------------------------------------------
+
+        if recording and writer is not None:
+
+            writer.write(result)
+
+            cv2.putText(
+                result,
+                "REC",
+                (20, 300),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1.2,
+                (0, 0, 255),
+                3
+            )
+
+        # --------------------------------------------------------------------------------------------------------------
+        # Anzeige
+        # --------------------------------------------------------------------------------------------------------------
+
         cv2.imshow(
             "Aruco Detection",
             result
@@ -57,9 +106,72 @@ def process_video(source,
 
         key = cv2.waitKey(1) & 0xFF
 
-        # ESC zum Beenden
+        # --------------------------------------------------------------------------------------------------------------
+        # ESC = Ende
+        # --------------------------------------------------------------------------------------------------------------
+
         if key == 27:
             break
+
+        # --------------------------------------------------------------------------------------------------------------
+        # R = Aufnahme toggeln
+        # --------------------------------------------------------------------------------------------------------------
+
+        elif key == ord('r'):
+
+            if not recording:
+
+                filename = create_timestamp_filename()
+
+                fps = 20.0
+
+                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+                fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+
+                writer = cv2.VideoWriter(
+                    filename,
+                    fourcc,
+                    fps,
+                    (width, height)
+                )
+
+                recording = True
+
+                print(f"Aufnahme gestartet: {filename}")
+
+            else:
+
+                recording = False
+
+                if writer is not None:
+                    writer.release()
+                    writer = None
+
+                print("Aufnahme beendet")
+
+        # --------------------------------------------------------------------------------------------------------------
+        # S = Screenshot
+        # --------------------------------------------------------------------------------------------------------------
+
+        elif key == ord('s'):
+
+            screenshot_file = create_screenshot_filename()
+
+            cv2.imwrite(
+                screenshot_file,
+                result
+            )
+
+            print(f"Screenshot gespeichert: {screenshot_file}")
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # Cleanup
+    # ------------------------------------------------------------------------------------------------------------------
+
+    if writer is not None:
+        writer.release()
 
     cap.release()
 
@@ -68,6 +180,7 @@ def process_video(source,
 
 # ----------------------------------------------------------------------------------------------------------------------
 def main():
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -117,6 +230,7 @@ def main():
         )
 
     else:
+
         print(
             "Bitte Parameter angeben: "
             "--image | --video | --webcam"
