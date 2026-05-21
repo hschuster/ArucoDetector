@@ -23,23 +23,14 @@ class ArucoDetector:
         corners, ids, rejected = self.detector.detectMarkers(gray)
 
         if ids is not None:
-            frame = cv2.aruco.drawDetectedMarkers(frame, corners, ids)
+            for marker_corners in corners:
+                pts = marker_corners.reshape((4, 2)).astype(int)
 
-            # Marker IDs zusätzlich als Text anzeigen
-            for i, corner in enumerate(corners):
-                c = corner[0]
+                # Linien zwischen den 4 Punkten zeichnen
+                for i in range(4):
+                    pt1 = tuple(pts[i])
+                    pt2 = tuple(pts[(i + 1) % 4])
 
-                center_x = int(c[:, 0].mean())
-                center_y = int(c[:, 1].mean())
-
-                cv2.putText(
-                    frame,
-                    f"ID: {ids[i][0]}",
-                    (center_x - 20, center_y - 20),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    (0, 255, 0),
-                    2
-                )
+                    cv2.line(frame, pt1, pt2, (0, 255, 0), 2)
 
         return frame

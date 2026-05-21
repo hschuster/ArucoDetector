@@ -75,7 +75,7 @@ def create_grid(
             cv2.putText(
                 canvas,
                 text,
-                (x + 10, y + single_size - 10),
+                (x + 5, y + single_size - 5),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.5,
                 (0,),
